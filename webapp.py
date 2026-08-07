@@ -353,12 +353,15 @@ def main():
     try:
         get_client().get_user_info()
     except Exception as e:
-        print(f"❌ 账号配置失败: {e}"); sys.exit(1)
+        print(f"⚠️ 账号未配置或Token失效，请在网页端手动登录: {e}")
 
     url = f"http://localhost:{PORT}"
-    print(f"🌐 服务已启动 → {url}")
-    threading.Thread(target=lambda: (__import__('time').sleep(0.5), webbrowser.open(url)), daemon=True).start()
-    server = HTTPServer(("localhost", PORT), H)
+    print(f"🌐 服务已启动，容器内已绑定 0.0.0.0:{PORT}")
+    try:
+        threading.Thread(target=lambda: (__import__('time').sleep(0.5), webbrowser.open(url)), daemon=True).start()
+    except Exception:
+        pass
+    server = HTTPServer(("0.0.0.0", PORT), H)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
