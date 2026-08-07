@@ -62,7 +62,7 @@ python3 query_venues.py --nodeid 101 --date 2026-08-05
 编辑 `config.py`：
 
 ```python
-TOKEN = "你从浏览器复制的token"    # 必填
+OPENID = "你的真实_OPENID"          # 必填，后续系统会自动获取 Token
 TARGET_NODE_ID = "101"              # 场地 nodeid
 TARGET_DATE = "2026-08-05"          # 预约日期（留空=明天）
 TARGET_TIME_SLOTS = ["08:00", "09:00"]  # 目标时间段（留空=自动选最早）
@@ -80,6 +80,28 @@ python3 grab_ticket.py
 ```bash
 python3 grab_ticket.py --nodeid 101 --date 2026-08-05 --start-time 08:00:00
 ```
+
+---
+
+## 🌐 服务器部署 (Web 可视化版本)
+
+为了获得最佳体验（图形化界面选座选时间），强烈推荐将本系统部署在服务器上 24 小时运行。
+
+### 🐳 方式一：Docker 部署（推荐）
+如果你服务器装有 Docker，只需在项目根目录运行：
+```bash
+docker-compose up -d
+```
+服务将在后台运行，挂掉也会自动重启。然后浏览器访问 `http://你的服务器IP:8765` 即可打开美观的 Web 抢票界面。
+
+### 🐧 方式二：原生 Linux 脚本部署
+如果你没有 Docker，我也提供了一键拉起服务的 Bash 脚本：
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+该脚本会自动创建虚拟环境、安装依赖，并用 `nohup` 将服务放入后台长期运行。
+停止服务可使用：`pkill -f webapp.py`
 
 ---
 
@@ -112,7 +134,7 @@ python3 manage_orders.py cancel <订单号>
 ```bash
 crontab -e
 # 添加：
-59 7 * * * cd /home/xiaoyu/Desktop/地大体育馆脚本 && python3 grab_ticket.py >> grab.log 2>&1
+59 7 * * * cd /path/to/project && python3 grab_ticket.py >> grab.log 2>&1
 ```
 
 ### 在精确时间抢票
@@ -140,31 +162,3 @@ MIN_TIME_SLOTS = 2  # 至少抢到2个时间段才算成功
 - **认证方式**: 请求头 `token: <token值>`
 - **加密算法**: AES-CBC，key=`0102030405060708`，iv=`0102030405060708`
 - **请求格式**: POST，body 为 `item=<AES加密后的JSON大写HEX>`
-
-### 关键 API 端点
-| 端点 | 功能 |
-|------|------|
-| `/phone/getBookingNode` | 获取可预约场地列表 |
-| `/phone/bookingByTime` | 查询某场地某日可用时间段 |
-| `/phone/getPayPrice` | 获取预约价格 |
-| `/phone/createBookingBytime` | **创建预约订单** |
-| `/phone/payOrderForPhone` | 查看订单列表 |
-| `/phone/payOrderDetails` | 订单详情 |
-| `/phone/cancelOrder` | 取消订单 |
-| `/userAddress/getUserInfo` | 获取用户信息 |
-
----
-
-## ❓ 常见问题
-
-**Q: 运行后报 "登录超时"？**
-A: Token 已过期，重新运行 `python3 get_token.py` 获取新 token。
-
-**Q: 一直重试但无法预约？**
-A: 可能是该日期/时间段还未开放预约，或场地已满。检查开放时间后再设置 `GRAB_START_TIME`。
-
-**Q: 如何知道抢票开放时间？**
-A: 手动在微信公众号查看，通常是前一天某个固定时间开放。
-
-**Q: 支持付费场地吗？**
-A: 目前脚本针对免费场地。付费场地需要微信支付，暂未实现自动支付流程。
