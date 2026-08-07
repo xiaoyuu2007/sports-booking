@@ -28,22 +28,15 @@ python3 install_deps.py
 pip install requests pycryptodome
 ```
 
-### 第二步：获取 Token
+### 第二步：配置账号
 
-Token 是你的登录凭证，需要从浏览器中提取：
+由于系统支持通过 OpenID 自动无限刷新 Token，所以你**不再需要手动抓取 Token**！
 
-```bash
-python3 get_token.py
+1. 在 `config.py` 中填写你的 `OPENID`：
+```python
+OPENID = "你的真实_OPENID"
 ```
-
-**手动提取方法：**
-1. 用浏览器打开：`https://bdtyg.cugb.edu.cn/#/pages/wxlogin/logging?openid=你的_OPENID&orgid=2`
-2. 登录后按 `F12` 打开开发者工具
-3. 点击 **Application** → **Local Storage** → `https://bdtyg.cugb.edu.cn`
-4. 找到 key 为 **`token`** 的值，复制
-5. 将值填入 `config.py` 的 `TOKEN` 字段
-
-> ⚠️ Token 会定期过期，过期后需要重新获取。
+2. 运行任意脚本或启动 web 服务时，系统会自动调用接口换取最新的 Token 并保持登录状态。Token 过期也会自动刷新，彻底解放双手！
 
 ### 第三步：查看场地列表
 
