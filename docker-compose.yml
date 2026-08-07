@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  cugb-sports:
+    build: .
+    container_name: cugb-sports-booking
+    ports:
+      - "8765:8765"
+    restart: unless-stopped
+    volumes:
+      - ./config.py:/app/config.py
