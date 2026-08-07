@@ -249,11 +249,10 @@ class H(BaseHTTPRequestHandler):
         try:
             if path == "/api/login":
                 raw_id = body.get("openid", "").strip()
-                if "openid=" in raw_id:
-                    import urllib.parse
-                    parsed = urllib.parse.urlparse(raw_id)
-                    qs_parsed = urllib.parse.parse_qs(parsed.query)
-                    openid = qs_parsed.get("openid", [""])[0]
+                import re
+                match = re.search(r'openid=([^&]+)', raw_id)
+                if match:
+                    openid = match.group(1)
                 else:
                     openid = raw_id
                 
