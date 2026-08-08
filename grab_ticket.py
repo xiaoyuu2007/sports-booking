@@ -126,9 +126,9 @@ def try_grab_target(client: VenueClient, target: dict,
     """
     尝试抢一个场地。
     Returns:
-        订单号字符串（成功）或 None（未抢到）
+        订单号字符串（成功）或 None（未抢到 / 需重试）
     Raises:
-        Exception: 网络/解析错误（让上层决定是否重试）
+        Exception: 网络/解析错误或非重试服务端错误（让上层决定是否重试）
     """
     nodeid    = target["nodeid"]
     name      = target["name"]
@@ -152,20 +152,27 @@ def try_grab_target(client: VenueClient, target: dict,
     coords   = [f"0-{ti}" for _, ti in selected]
     t_strs   = [t for t, _ in selected]
 
-    # 2. 获取真实价格（关键：必须和服务器一致，否则报"支付金额异常"）
+    # 2. 获取真实价格（关键：重试最多3次，不允许静默回款0元）
     txamt = 0
     if node_list and user_idserial:
-        try:
-            price_info = client.get_pay_price(
-                nodeid=nodeid,
-                node_list=node_list,
-                reserve_times=coords,
-                reserve_date=book_date,
-                user_idserial=user_idserial,
-            )
-            txamt = int(price_info.get("txamt", 0))
-        except Exception:
-            txamt = 0  # 获取失败就用 0 试一下
+        last_err = None
+        for attempt in range(3):
+            try:
+                price_info = client.get_pay_price(
+                    nodeid=nodeid,
+                    node_list=node_list,
+                    reserve_times=coords,
+                    reserve_date=book_date,
+                    user_idserial=user_idserial,
+                )
+                txamt = int(price_info.get("txamt", 0))
+                last_err = None
+                break
+            except Exception as e:
+                last_err = e
+                time.sleep(0.2)
+        if last_err is not None:
+            raise Exception(f"获取价格失败(已重试3次): {last_err}")
 
     # 3. 提交预约
     param = {
@@ -199,13 +206,15 @@ def try_grab_target(client: VenueClient, target: dict,
         )
         return order_id
 
-    # 服务器返回失败（时段被抢走、时间窗口未开、额度不足……）
-    msg = result.get("message", "未知")
-    # 只有明确"时段已满"才返回 None，其他异常原因直接透传
-    if any(kw in msg for kw in ["已满", "已预约", "无法预约", "不可预约"]):
+    # 服务器返回失败
+    msg = result.get("message", "未知错误")
+    # 可重试/时段不可用关键词列表
+    retryable_keywords = ["已满", "已预约", "无法预约", "不可预约", "未开放", "未开始", "系统繁忙", "请稍后", "暂无"]
+    if any(kw in msg for kw in retryable_keywords):
         return None
-    # 时间窗口未开、限额等情况 → 也返回 None 继续重试
-    return None
+
+    # 非重试错误（如账号异常、参数不合法、限制退订等）：抛出异常透传
+    raise Exception(f"预约提交失败 [{msg}]")
 
 
 # ══════════════════════════════════════════════════════
@@ -219,7 +228,7 @@ class MultiTargetGrabber:
                  retry_interval: float = 0.3,
                  max_retries: int = 0):
         self.client       = VenueClient(token=token,
-                                        timeout=getattr(config, "REQUEST_TIMEOUT", 10))
+                                        timeout=getattr(config, "REQUEST_TIMEOUT", (3.05, 10)))
         self.book_date    = book_date
         self.primary      = primary
         self.candidates   = candidates
@@ -287,26 +296,29 @@ class MultiTargetGrabber:
 
         log_grab(f"开始抢票！主目标每轮尝试 {self.primary_tries} 次后切换候选")
 
-        while not self.success:
-            # --- 主要目标：连续 primary_tries 次 ---
-            for _ in range(self.primary_tries):
-                if self._try_one(self.primary):
-                    return True
-                if self.max_retries > 0 and self.attempt >= self.max_retries:
-                    log_err(f"达到最大重试次数 {self.max_retries}，退出")
-                    return False
-                time.sleep(self.retry_interval)
+        try:
+            while not self.success:
+                # --- 主要目标：连续 primary_tries 次 ---
+                for _ in range(self.primary_tries):
+                    if self._try_one(self.primary):
+                        return True
+                    if self.max_retries > 0 and self.attempt >= self.max_retries:
+                        log_err(f"达到最大重试次数 {self.max_retries}，退出")
+                        return False
+                    time.sleep(self.retry_interval)
 
-            # --- 候选：各试一次 ---
-            for cand in all_targets:
-                if self._try_one(cand):
-                    return True
-                if self.max_retries > 0 and self.attempt >= self.max_retries:
-                    log_err(f"达到最大重试次数 {self.max_retries}，退出")
-                    return False
-                time.sleep(self.retry_interval)
+                # --- 候选：各试一次 ---
+                for cand in all_targets:
+                    if self._try_one(cand):
+                        return True
+                    if self.max_retries > 0 and self.attempt >= self.max_retries:
+                        log_err(f"达到最大重试次数 {self.max_retries}，退出")
+                        return False
+                    time.sleep(self.retry_interval)
 
-        return self.success
+            return self.success
+        finally:
+            self.client.close()
 
 
 # ══════════════════════════════════════════════════════
@@ -353,7 +365,7 @@ def main():
     candidates = getattr(config, "CANDIDATES", [])
 
     if not token:
-        log_err("请先获取 token！运行: python3 get_token.py")
+        log_err("无法获取 Token！请确保 config.py 中配置了 OPENID")
         sys.exit(1)
     if not primary.get("nodeid"):
         log_err("请在 config.py 中配置 PRIMARY（主要场地）")

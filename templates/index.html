@@ -172,7 +172,6 @@ button { font-family: inherit; }
     <span id="uname">连接中…</span>
     <span onclick="document.getElementById('login-modal').style.display='flex'" style="cursor:pointer; font-size:12px; color:var(--acc); margin-left:4px;">[切换账号]</span>
   </div>
-  </div>
 </header>
 
 <div class="wrap">
@@ -289,7 +288,7 @@ button { font-family: inherit; }
     </div>
     <div style="display:flex; gap:10px;">
       <button class="cbtn-lg" style="flex:1; justify-content:center; background:var(--bd); color:#fff;" onclick="document.getElementById('login-modal').style.display='none'">取消</button>
-      <button class="cbtn-lg" style="flex:1; justify-content:center; background:var(--blu); color:#fff;" onclick="doLogin()">登录</button>
+      <button class="cbtn-lg" style="flex:1; justify-content:center; background:var(--acc); color:#fff;" onclick="doLogin()">登录</button>
     </div>
   </div>
 </div>
@@ -320,8 +319,10 @@ const STANDARD_TIMES = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00',
 async function loadUser(){
   try{
       const r=await api('/api/user');
-      document.getElementById('uname').textContent=r.data.username+' · '+r.data.idserial;
-  }catch{
+      if (r && r.data) {
+          document.getElementById('uname').textContent=(r.data.username || '用户')+' · '+(r.data.idserial || '');
+      }
+  }catch(e){
       document.getElementById('login-modal').style.display='flex';
   }
 }
@@ -335,6 +336,7 @@ async function doLogin(){
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({openid: input})
       });
+      if(!r.ok) throw new Error('HTTP ' + r.status);
       const data = await r.json();
       if(data.success){
           document.getElementById('login-modal').style.display='none';
@@ -344,14 +346,15 @@ async function doLogin(){
           alert(data.message || '登录失败，可能是 openid 错误');
       }
   }catch(e){
-      alert('请求失败');
+      alert('登录请求失败: ' + (e.message || e));
   }
 }
 
 async function loadVenues(){
+  document.getElementById('vlist').innerHTML='<div class="ldg"><div class="spin"></div>加载中…</div>';
   try{
     const r=await api('/api/venues');
-    venues=r.data.filter(v => v.nodename !== '篮球');
+    venues=(r.data || []).filter(v => v.nodename !== '篮球');
     document.getElementById('vlist').innerHTML=venues.map(v=>`
       <button class="vbtn" id="v${v.id}" onclick="pickV('${v.id}','${v.nodename}')">
         <div class="vi">${VI[v.nodename]||'🏟️'}</div>
@@ -368,7 +371,14 @@ async function loadVenues(){
     let ds = tomorrow.getFullYear()+'-'+String(tomorrow.getMonth()+1).padStart(2,'0')+'-'+String(tomorrow.getDate()).padStart(2,'0');
     document.getElementById('ag-date').value = ds;
 
-  }catch(e){document.getElementById('vlist').innerHTML='<div class="empty">加载失败</div>'}
+  }catch(e){
+    document.getElementById('vlist').innerHTML=`
+      <div class="empty" style="color:var(--err)">
+        加载场地失败: ${e.message || e}<br>
+        <button class="cbtn" style="margin-top:10px;" onclick="loadVenues()">重新加载</button>
+      </div>`;
+    toast('err', '加载场地失败: ' + (e.message || e));
+  }
 }
 
 function buildTimeChipsHtml(prefix) {
@@ -415,7 +425,6 @@ function buildDates(){
   document.getElementById('sv1').textContent=selD + '，0人同行';
 }
 
-
 function updateAccompanyUI() {
     let choices = [0, 1, 2, 3];
     let hideSection = false;
@@ -444,7 +453,6 @@ function updateAccompanyUI() {
 }
 
 function pickAccompany(num, el) {
-
     selAccompany = num;
     document.querySelectorAll('#accompanyRow .dc').forEach(c => c.classList.remove('on'));
     el.classList.add('on');
@@ -473,7 +481,7 @@ async function pickD(ds,el){
 
 async function loadSlots(){
   if(!selV||!selD) return;
-  document.getElementById('sgrid').innerHTML='<div class="ldg"><div class="spin"></div></div>';
+  document.getElementById('sgrid').innerHTML='<div class="ldg"><div class="spin"></div>加载中…</div>';
   try{
     const r=await api(`/api/slots?nodeid=${selV.id}&date=${selD}`);
     tl=r.timeList||[]; nl=r.nodeList||[]; priceList=r.priceList||[]; conflictList=r.conflictList||[];
@@ -481,7 +489,14 @@ async function loadSlots(){
     minTimeSelect = r.mintimeselect || 1;
     maxNodeNum = r.maxAppointmentNodeNum || 999;
     renderSlots();
-  }catch(e){document.getElementById('sgrid').innerHTML='<div class="empty">加载失败</div>'}
+  }catch(e){
+    document.getElementById('sgrid').innerHTML=`
+      <div class="empty" style="color:var(--err)">
+        加载场次失败: ${e.message || e}<br>
+        <button class="cbtn" style="margin-top:10px;" onclick="loadSlots()">重新加载</button>
+      </div>`;
+    toast('err', '加载场次失败: ' + (e.message || e));
+  }
 }
 
 function renderSlots(){
@@ -489,7 +504,6 @@ function renderSlots(){
     document.getElementById('sgrid').innerHTML='<div class="empty">该日期暂无时段</div>'; return;
   }
   
-  // official API uses x for time index, y for court index
   let valid_x = [...new Set(priceList.map(p => parseInt(p.x)))].sort((a,b)=>a-b);
   if(!valid_x.length) {
       document.getElementById('sgrid').innerHTML='<div class="empty">该日期暂无可用区块</div>'; return;
@@ -517,8 +531,8 @@ function renderSlots(){
       h += `<tr><td class="r-time">${timeLabel}</td>`;
       
       nl.forEach((n, y) => {
-          let coord = `${x}-${y}`; // API format for booking is timeIdx-courtIdx (x-y)
-          let conflictCoord = `${y}-${x}`; // API format for conflictList is courtIdx-timeIdx (y-x)
+          let coord = `${x}-${y}`;
+          let conflictCoord = `${y}-${x}`;
           let conflictItems = conflictList.filter(c => c === conflictCoord || c.startsWith(conflictCoord + '-'));
           let isConflict = conflictItems.length > 0;
           let pItem = priceList.find(p => parseInt(p.x) === x && parseInt(p.y) === y);
@@ -527,7 +541,7 @@ function renderSlots(){
               h += `<td class="mcell disabled"></td>`;
           } else if(isConflict || String(tl[x].status) !== "0") {
               let label = "已预定";
-              let bg = "#1d4ed8"; // default blue for booked
+              let bg = "#1d4ed8";
               let tc = "#ffffff";
               
               if (!isConflict && String(tl[x].status) !== "0") {
@@ -597,18 +611,12 @@ async function sync(){
           const r = await api('/api/price', 'POST', {
               nodeid:selV.id, date:selD, coords:selS.map(x=>x.coord), childrennum:selAccompany
           });
-          if(r.success) {
-              const p = r.price / 100;
-              sp.innerHTML = `¥ ${p.toFixed(2)}`;
-              b.textContent=`¥${p.toFixed(0)} 提交订单`;
-              b.disabled = false;
-          } else {
-              sp.innerHTML = '<span style="color:var(--warn);font-size:12px">'+(r.message||'获取失败')+'</span>';
-              b.textContent=`无法预定`;
-              b.disabled = true;
-          }
+          const p = r.price / 100;
+          sp.innerHTML = `¥ ${p.toFixed(2)}`;
+          b.textContent=`¥${p.toFixed(0)} 提交订单`;
+          b.disabled = false;
       } catch(e) {
-          sp.innerHTML = '<span style="color:var(--warn);font-size:12px">获取失败</span>';
+          sp.innerHTML = '<span style="color:var(--warn);font-size:12px">'+(e.message || '获取失败')+'</span>';
           b.textContent=`无法预定`;
           b.disabled = true;
       }
@@ -625,16 +633,17 @@ async function book(){
     const r=await api('/api/book','POST',{
         nodeid:selV.id, date:selD, coords:selS.map(x=>x.coord), childrennum:selAccompany
     });
-    if(r.success){
-      toast('ok',`🎉 预约成功！`);
-      selS=[]; sync(); await loadSlots();
-    } else toast('err','❌ '+r.message);
-  }catch(e){toast('err','❌ 失败')}
+    toast('ok',`🎉 预约成功！`);
+    selS=[]; sync(); await loadSlots();
+  }catch(e){
+    toast('err','❌ ' + (e.message || '提交预约失败'));
+  }
   b.classList.remove('busy'); sync();
 }
 
 /* ─── orders ─── */
 async function loadOrders(){
+  document.getElementById('olist').innerHTML='<div class="ldg"><div class="spin"></div>加载中…</div>';
   try{
     const r=await api('/api/orders');
     const orders=r.orders||[];
@@ -654,23 +663,38 @@ async function loadOrders(){
         ${can?`<button class="cbtn" onclick="cancelOrd('${oid}')">取消</button>`:''}
       </div>`;
     }).join('');
-  }catch(e){}
+  }catch(e){
+    document.getElementById('olist').innerHTML=`
+      <div class="empty" style="color:var(--err)">
+        加载订单列表失败: ${e.message || e}<br>
+        <button class="cbtn" style="margin-top:10px;" onclick="loadOrders()">重新加载</button>
+      </div>`;
+    toast('err', '加载订单失败: ' + (e.message || e));
+  }
 }
 
 async function cancelOrd(oid){
   try{
-    const info = await api(`/api/cancel_info?id=${oid}`);
+    let info = null;
+    try {
+      info = await api(`/api/cancel_info?id=${oid}`);
+    } catch(err) {
+      console.warn('获取取消规则失败:', err);
+    }
     let msg = "确定取消此预约？";
-    if (info.success && info.message) {
+    if (info && info.success && info.message) {
         msg = `【官方退订规则】\n${info.message}\n\n确定继续取消此预约吗？`;
     } else {
         msg = "确定取消此预约？\n⚠️ 请注意官方的退订和爽约次数限制，多次可能导致封停！";
     }
     if(!confirm(msg)) return;
     
-    const r=await api('/api/cancel','POST',{id:oid});
-    if(r.success){toast('ok','✅ 取消成功');await loadOrders()} else toast('err','❌ '+r.message);
-  }catch{}
+    await api('/api/cancel','POST',{id:oid});
+    toast('ok','✅ 取消成功');
+    await loadOrders();
+  }catch(e){
+    toast('err', '❌ 取消订单失败: ' + (e.message || e));
+  }
 }
 
 /* ─── auto grab ─── */
@@ -683,8 +707,12 @@ function getSelectedChips(prefix) {
 
 async function toggleGrab(){
     if(isGrabbing) {
-        await api('/api/autograb/stop', 'POST', {});
-        updateGrabBtn(false);
+        try {
+            await api('/api/autograb/stop', 'POST', {});
+            updateGrabBtn(false);
+        } catch(e) {
+            toast('err', '停止失败: ' + (e.message || e));
+        }
     } else {
         const primary = {
             nodeid: document.getElementById('ag-primary-vid').value,
@@ -713,10 +741,12 @@ async function toggleGrab(){
             primary_tries: 3,
             retry_interval: 0.3
         };
-        const r = await api('/api/autograb/start', 'POST', cfg);
-        if(r.success) {
+        try {
+            const r = await api('/api/autograb/start', 'POST', cfg);
             toast('ok', '🚀 抢票任务已启动');
             updateGrabBtn(true);
+        } catch(e) {
+            toast('err', '启动失败: ' + (e.message || e));
         }
     }
 }
@@ -740,14 +770,16 @@ async function pollLogs() {
     try {
         const r = await api('/api/autograb/status');
         const box = document.getElementById('ag-log');
-        box.innerHTML = r.logs.join('<br>');
+        box.innerHTML = (r.logs || []).join('<br>');
         box.scrollTop = box.scrollHeight;
         if(isGrabbing && !r.running) {
             updateGrabBtn(false);
         } else if (!isGrabbing && r.running) {
             updateGrabBtn(true);
         }
-    } catch(e) {}
+    } catch(e) {
+        console.error('轮询日志失败:', e);
+    }
 }
 
 /* ─── tabs ─── */
@@ -762,11 +794,30 @@ function tab(name,el){
 }
 
 /* ─── utils ─── */
-async function api(url,method='GET',body=null){
-  const opts={method,headers:{}};
-  if(body){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body)}
-  const r=await fetch(B+url,opts);
-  return r.json();
+async function api(url, method='GET', body=null) {
+  const opts = { method, headers: {} };
+  if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  let r;
+  try {
+    r = await fetch(B + url, opts);
+  } catch (err) {
+    throw new Error('网络连接异常，请检查网络');
+  }
+  if (!r.ok) {
+    throw new Error(`HTTP 错误: ${r.status}`);
+  }
+  const json = await r.json();
+  if (json && json.success === false) {
+    throw new Error(json.message || '操作失败');
+  }
+  return json;
+}
+
+function showToast(msg) {
+  toast('ok', msg);
 }
 
 function toast(type,msg){

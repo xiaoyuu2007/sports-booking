@@ -10,7 +10,6 @@
 |------|------|
 | `config.py` | **配置文件**（必须先填写） |
 | `api_client.py` | API 封装库（核心） |
-| `get_token.py` | **步骤1**：获取登录 token |
 | `query_venues.py` | **步骤2**：查看场地列表和时间段 |
 | `grab_ticket.py` | **步骤3**：自动抢票主脚本 |
 | `manage_orders.py` | 查看和取消订单 |

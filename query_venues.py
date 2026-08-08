@@ -25,53 +25,52 @@ def main():
         print("   获取方法见 README.md")
         sys.exit(1)
 
-    client = VenueClient(token=token)
-
-    # 查询用户信息
-    print("🔍 正在获取用户信息...")
-    try:
-        user = client.get_user_info()
-        print(f"✅ 当前用户: {user.get('username', '未知')} ({user.get('idserial', '')})")
-    except Exception as e:
-        print(f"⚠️  获取用户信息失败: {e}")
-
-    # 查询可预约场地列表
-    print("\n🏟️  正在获取场地列表...")
-    try:
-        nodes = client.get_booking_nodes()
-        print(f"✅ 共找到 {len(nodes)} 个可预约场地：\n")
-        
-        for i, node in enumerate(nodes):
-            nodeid = node.get("nodeid") or node.get("id", "")
-            name = node.get("nodename") or node.get("name", "未知")
-            nodetype = node.get("nodetype", "")
-            print(f"  [{i+1:02d}] nodeid={nodeid:<8} {name}  (类型: {nodetype})")
-    except Exception as e:
-        print(f"❌ 获取场地列表失败: {e}")
-        return
-
-    # 如果指定了 nodeid，查询该场地的可用时间
-    if args.nodeid:
-        target_date = args.date or str(date.today() + timedelta(days=1))
-        print(f"\n⏰ 正在查询场地 {args.nodeid} 在 {target_date} 的可用时间...")
+    with VenueClient(token=token) as client:
+        # 查询用户信息
+        print("🔍 正在获取用户信息...")
         try:
-            data = client.get_available_times(args.nodeid, target_date)
-            time_list = data.get("timeList", [])
-            node_list = data.get("nodeList", [])
-            price = data.get("price", 0)
-            
-            print(f"\n📋 场地信息:")
-            print(f"   - 场地数量: {len(node_list)}")
-            print(f"   - 单价: {price/100 if isinstance(price, int) else price} 元/格")
-            print(f"\n🕐 可用时间段 (共 {len(time_list)} 个):")
-            
-            for j, slot in enumerate(time_list):
-                slot_time = slot.get("time") or slot.get("starttime", "")
-                available = slot.get("available", slot.get("status", ""))
-                print(f"   [{j:02d}] {slot_time}  状态: {available}")
-                
+            user = client.get_user_info()
+            print(f"✅ 当前用户: {user.get('username', '未知')} ({user.get('idserial', '')})")
         except Exception as e:
-            print(f"❌ 查询时间段失败: {e}")
+            print(f"⚠️  获取用户信息失败: {e}")
+
+        # 查询可预约场地列表
+        print("\n🏟️  正在获取场地列表...")
+        try:
+            nodes = client.get_booking_nodes()
+            print(f"✅ 共找到 {len(nodes)} 个可预约场地：\n")
+            
+            for i, node in enumerate(nodes):
+                nodeid = node.get("nodeid") or node.get("id", "")
+                name = node.get("nodename") or node.get("name", "未知")
+                nodetype = node.get("nodetype", "")
+                print(f"  [{i+1:02d}] nodeid={nodeid:<8} {name}  (类型: {nodetype})")
+        except Exception as e:
+            print(f"❌ 获取场地列表失败: {e}")
+            return
+
+        # 如果指定了 nodeid，查询该场地的可用时间
+        if args.nodeid:
+            target_date = args.date or str(date.today() + timedelta(days=1))
+            print(f"\n⏰ 正在查询场地 {args.nodeid} 在 {target_date} 的可用时间...")
+            try:
+                data = client.get_available_times(args.nodeid, target_date)
+                time_list = data.get("timeList", [])
+                node_list = data.get("nodeList", [])
+                price = data.get("price", 0)
+                
+                print(f"\n📋 场地信息:")
+                print(f"   - 场地数量: {len(node_list)}")
+                print(f"   - 单价: {price/100 if isinstance(price, int) else price} 元/格")
+                print(f"\n🕐 可用时间段 (共 {len(time_list)} 个):")
+                
+                for j, slot in enumerate(time_list):
+                    slot_time = slot.get("time") or slot.get("starttime", "")
+                    available = slot.get("available", slot.get("status", ""))
+                    print(f"   [{j:02d}] {slot_time}  状态: {available}")
+                    
+            except Exception as e:
+                print(f"❌ 查询时间段失败: {e}")
 
 
 if __name__ == "__main__":

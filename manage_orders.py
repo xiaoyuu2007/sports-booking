@@ -37,7 +37,6 @@ def get_client():
 
 
 def list_orders(args):
-    client = get_client()
     status = getattr(args, "status", None)
     
     print(f"\n{'='*65}")
@@ -45,13 +44,22 @@ def list_orders(args):
     print(f"{'='*65}")
 
     all_orders = []
-    for page in range(1, 4):  # 最多读3页
-        orders = client.get_orders(status=status, page=page)
-        if not orders:
-            break
-        all_orders.extend(orders)
-        if len(orders) < 10:
-            break
+    api_error = None
+    with get_client() as client:
+        try:
+            for page in range(1, 4):  # 最多读3页
+                orders = client.get_orders(status=status, page=page)
+                if not orders:
+                    break
+                all_orders.extend(orders)
+                if len(orders) < 10:
+                    break
+        except Exception as e:
+            api_error = e
+
+    if api_error is not None:
+        print(f"  ❌ 获取订单列表失败: {api_error}")
+        return
 
     if not all_orders:
         print("  暂无订单")
@@ -77,45 +85,45 @@ def list_orders(args):
 
 
 def cancel_order_cmd(args):
-    client = get_client()
     order_id = args.orderid
 
     if not order_id:
         print("❌ 请指定订单号")
         sys.exit(1)
 
-    # 先检查取消次数
-    print(f"🔍 检查取消次数限制...")
-    try:
-        check = client.check_cancel_count(order_id)
-        if check.get("resultData") is not None:
-            remaining = check.get("resultData", {})
-            print(f"   本月剩余取消次数: {remaining}")
-    except Exception as e:
-        print(f"   检查失败（继续尝试取消）: {e}")
-
-    confirm = input(f"\n⚠️  确定取消订单 {order_id}？（注意：每月只能取消3次）[y/N] ").strip().lower()
-    if confirm != "y":
-        print("已取消操作")
-        return
-
-    print(f"🗑️  正在取消订单 {order_id}...")
-    try:
-        success = client.cancel_order(order_id)
-        if success:
-            print(f"✅ 订单 {order_id} 已成功取消")
-        else:
-            print(f"❌ 取消失败")
-    except Exception as e:
-        # 如果 cancelOrder 失败，尝试 userCancelBooking
+    with get_client() as client:
+        # 先检查取消次数
+        print(f"🔍 检查取消次数限制...")
         try:
-            success = client.cancel_booking(order_id)
+            check = client.check_cancel_count(order_id)
+            if check.get("resultData") is not None:
+                remaining = check.get("resultData", {})
+                print(f"   本月剩余取消次数: {remaining}")
+        except Exception as e:
+            print(f"   检查失败（继续尝试取消）: {e}")
+
+        confirm = input(f"\n⚠️  确定取消订单 {order_id}？（注意：每月只能取消3次）[y/N] ").strip().lower()
+        if confirm != "y":
+            print("已取消操作")
+            return
+
+        print(f"🗑️  正在取消订单 {order_id}...")
+        try:
+            success = client.cancel_order(order_id)
             if success:
-                print(f"✅ 预约 {order_id} 已成功取消")
+                print(f"✅ 订单 {order_id} 已成功取消")
             else:
                 print(f"❌ 取消失败")
-        except Exception as e2:
-            print(f"❌ 取消失败: {e2}")
+        except Exception as e:
+            # 如果 cancelOrder 失败，尝试 userCancelBooking
+            try:
+                success = client.cancel_booking(order_id)
+                if success:
+                    print(f"✅ 预约 {order_id} 已成功取消")
+                else:
+                    print(f"❌ 取消失败")
+            except Exception as e2:
+                print(f"❌ 取消失败: {e2}")
 
 
 def main():
