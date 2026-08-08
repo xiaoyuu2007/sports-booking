@@ -34,7 +34,7 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-        pyinstaller --noconfirm --onefile --console --name "cugb-sports-booking" --add-data "templates:templates" webapp.py
+        pyinstaller --noconfirm --onefile --console --name "cugb-sports-booking-${{ runner.os }}" --add-data "templates:templates" webapp.py
 
     - name: Upload Artifact (Windows)
       if: runner.os == 'Windows'
@@ -63,21 +63,4 @@ jobs:
       with:
         files: dist/*
 
-  build-apk:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
 
-      - name: Build with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
-        with:
-          command: buildozer android debug
-          buildozer_version: master
-
-      - name: Upload Artifact (Android)
-        uses: actions/upload-artifact@v4
-        with:
-          name: 抢票神器-Android
-          path: bin/*.apk
