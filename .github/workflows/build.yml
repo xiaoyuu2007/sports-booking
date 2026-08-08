@@ -34,7 +34,7 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-        pyinstaller --noconfirm --onefile --console --name "地大体育馆抢票神器" webapp.py
+        pyinstaller --noconfirm --onefile --console --name "地大体育馆抢票神器" --add-data "templates:templates" webapp.py
 
     - name: Upload Artifact (Windows)
       if: runner.os == 'Windows'

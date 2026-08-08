@@ -255,8 +255,19 @@ class AutoGrabber:
 auto_grabber = AutoGrabber()
 
 
+def get_resource_dir():
+    if getattr(sys, 'frozen', False):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
+def get_exe_dir():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
 def get_html():
-    with open(os.path.join(os.path.dirname(__file__), "templates", "index.html"), "r", encoding="utf-8") as f:
+    template_path = os.path.join(get_resource_dir(), "templates", "index.html")
+    with open(template_path, "r", encoding="utf-8") as f:
         return f.read()
 
 
@@ -350,7 +361,7 @@ class H(BaseHTTPRequestHandler):
                     _client = VenueClient(token=token)
 
                 try:
-                    config_path = os.path.join(os.path.dirname(__file__), "config.py")
+                    config_path = os.path.join(get_exe_dir(), "config.py")
                     if not os.path.exists(config_path):
                         config_path = "config.py"
                     with open(config_path, "r", encoding="utf-8") as f:
