@@ -34,27 +34,27 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-        pyinstaller --noconfirm --onefile --console --name "地大体育馆抢票神器" --add-data "templates:templates" webapp.py
+        pyinstaller --noconfirm --onefile --console --name "cugb-sports-booking" --add-data "templates:templates" webapp.py
 
     - name: Upload Artifact (Windows)
       if: runner.os == 'Windows'
       uses: actions/upload-artifact@v4
       with:
-        name: 抢票神器-Windows
+        name: cugb-sports-booking-Windows
         path: dist/*.exe
 
     - name: Upload Artifact (macOS)
       if: runner.os == 'macOS'
       uses: actions/upload-artifact@v4
       with:
-        name: 抢票神器-macOS
+        name: cugb-sports-booking-macOS
         path: dist/*
 
     - name: Upload Artifact (Linux)
       if: runner.os == 'Linux'
       uses: actions/upload-artifact@v4
       with:
-        name: 抢票神器-Linux
+        name: cugb-sports-booking-Linux
         path: dist/*
 
     - name: Release to GitHub
